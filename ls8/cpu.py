@@ -11,6 +11,7 @@ class CPU:
         self.registers = [0] * 8
         self.ram = [0] * 256
         self.pc = 0
+        self.sp = 7
 
     def load(self, filename):
         """Load a program into memory."""
@@ -87,6 +88,8 @@ class CPU:
         LDI = 0b10000010
         PRN = 0b01000111
         MUL = 0b10100010
+        PUSH = 0b01000101
+        POP = 0b01000110
 
         while running:
             IR = self.ram_read(self.pc)
@@ -105,3 +108,15 @@ class CPU:
             elif IR == MUL:
                 product = self.alu("MUL", operand_a, operand_b)
                 self.pc += 3
+            elif IR == PUSH:
+                reg = self.ram_read(self.pc + 1)
+                val = self.registers[reg]
+                self.registers[self.sp] -= 1
+                self.ram_write(self.registers[self.sp], val)
+                self.pc += 2
+            elif IR == POP:
+                reg = self.ram_read(self.pc + 1)
+                val = self.ram_read(self.registers[self.sp])
+                self.registers[reg] = val
+                self.registers[self.sp] += 1
+                self.pc += 2
