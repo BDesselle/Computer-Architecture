@@ -12,7 +12,9 @@ if len(sys.argv) != 2:
     sys.exit(1)
 
 script_dir = os.path.dirname(__file__)
-file_path = os.path.join(script_dir, sys.argv[1])  # file path
+
+# argument should be file path, e.g. ./example/foo.bar
+file_path = os.path.join(script_dir, sys.argv[1])
 
 cpu = CPU()
 
