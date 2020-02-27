@@ -2,6 +2,16 @@
 
 import sys
 
+HLT = 0b00000001
+LDI = 0b10000010
+PRN = 0b01000111
+MUL = 0b10100010
+PUSH = 0b01000101
+POP = 0b01000110
+CALL = 0b01010000
+RET = 0b00010001
+ADD = 0b10100000
+
 
 class CPU:
     """Main CPU class."""
@@ -12,6 +22,16 @@ class CPU:
         self.ram = [0] * 256
         self.pc = 0
         self.sp = 7
+        self.registers[7] = 0xF4
+        self.branchtable = {}
+        self.branchtable[ADD] = self.add
+        self.branchtable[LDI] = self.ldi
+        self.branchtable[PRN] = self.prn
+        self.branchtable[MUL] = self.mul
+        self.branchtable[PUSH] = self.push
+        self.branchtable[POP] = self.pop
+        self.branchtable[CALL] = self.call
+        self.branchtable[RET] = self.ret
 
     def load(self, filename):
         """Load a program into memory."""
@@ -48,7 +68,7 @@ class CPU:
         """ALU operations."""
 
         if op == "ADD":
-            self.reg[reg_a] += self.reg[reg_b]
+            self.registers[reg_a] += self.registers[reg_b]
         # elif op == "SUB": etc
         elif op == "MUL":
             self.registers[reg_a] *= self.registers[reg_b]
@@ -60,6 +80,41 @@ class CPU:
 
     def ram_write(self, MAR, MDR):
         self.ram[MAR] = MDR
+
+    def ldi(self, a=None, b=None):
+        self.registers[a] = b
+
+    def prn(self, a=None, b=None):
+        print(self.registers[a])
+
+    def add(self, a=None, b=None):
+        self.alu("ADD", a, b)
+
+    def mul(self, a=None, b=None):
+        self.alu("MUL", a, b)
+
+    def push(self, a=None, b=None):
+        self.registers[self.sp] -= 1
+        val = self.registers[a]
+        self.ram_write(self.registers[self.sp], val)
+
+    def pop(self, a=None, b=None):
+        val = self.ram_read(self.registers[self.sp])
+        self.registers[a] = val
+        self.registers[self.sp] += 1
+
+    def call(self, a=None, b=None):
+        val = self.pc + 2
+        self.registers[self.sp] -= 1
+        self.ram_write(self.registers[self.sp], val)
+        reg = self.ram_read(self.pc + 1)
+        addr = self.registers[reg]
+        self.pc = addr
+
+    def ret(self, a=None, b=None):
+        ret_addr = self.registers[self.sp]
+        self.pc = self.ram_read(ret_addr)
+        self.registers[self.sp] += 1
 
     def trace(self):
         """
@@ -84,12 +139,6 @@ class CPU:
     def run(self):
         """Run the CPU."""
         running = True
-        HLT = 0b00000001
-        LDI = 0b10000010
-        PRN = 0b01000111
-        MUL = 0b10100010
-        PUSH = 0b01000101
-        POP = 0b01000110
 
         while running:
             IR = self.ram_read(self.pc)
@@ -99,24 +148,10 @@ class CPU:
                 print("Exiting program...")
                 running = False
                 print("Program exited")
-            elif IR == LDI:
-                self.registers[operand_a] = operand_b
-                self.pc += 3
-            elif IR == PRN:
-                print(self.registers[operand_a])
-                self.pc += 2
-            elif IR == MUL:
-                product = self.alu("MUL", operand_a, operand_b)
-                self.pc += 3
-            elif IR == PUSH:
-                reg = self.ram_read(self.pc + 1)
-                val = self.registers[reg]
-                self.registers[self.sp] -= 1
-                self.ram_write(self.registers[self.sp], val)
-                self.pc += 2
-            elif IR == POP:
-                reg = self.ram_read(self.pc + 1)
-                val = self.ram_read(self.registers[self.sp])
-                self.registers[reg] = val
-                self.registers[self.sp] += 1
-                self.pc += 2
+            elif IR == CALL or IR == RET:
+                self.branchtable[IR]()
+            elif IR in self.branchtable:
+                self.branchtable[IR](operand_a, operand_b)
+                self.pc += (IR >> 6) + 1
+            else:
+                print("Unrecognized command, fatal error")
